@@ -18,3 +18,28 @@ class TodoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PdfUploadResponse(BaseModel):
+    document_id: str
+    filename: str
+    chunks_indexed: int
+    message: str
+
+
+class PdfQuestionRequest(BaseModel):
+    question: str
+
+
+class PdfSourceChunk(BaseModel):
+    chunk_index: int
+    page_number: Optional[int] = None
+    score: float
+    text: str
+
+
+class PdfQuestionResponse(BaseModel):
+    document_id: str
+    question: str
+    answer: str
+    sources: list[PdfSourceChunk]
