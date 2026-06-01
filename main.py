@@ -1,5 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
@@ -9,7 +8,8 @@ load_dotenv()
 import models
 import schemas
 import crud
-
+from rag_service import ask_question_about_pdf, index_pdf_document
+from fastapi.middleware.cors import CORSMiddleware
 from database import engine, SessionLocal, run_migrations
 
 # Perform automatic database check/alteration for new columns
@@ -107,3 +107,29 @@ def delete_todo(
         )
 
     return {"message": "Todo deleted"}
+
+
+@app.post("/rag/pdf", response_model=schemas.PdfUploadResponse)
+def upload_pdf_for_rag(file: UploadFile = File(...)):
+    if file.content_type not in {"application/pdf", "application/x-pdf"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are supported"
+        )
+
+    try:
+        return index_pdf_document(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/rag/pdf/{document_id}/ask", response_model=schemas.PdfQuestionResponse)
+def ask_pdf_question(document_id: str, payload: schemas.PdfQuestionRequest):
+    try:
+        return ask_question_about_pdf(document_id, payload.question)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
