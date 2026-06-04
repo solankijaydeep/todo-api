@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import UploadFile
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -18,36 +18,34 @@ RAG_ROOT = Path(os.getenv("RAG_STORAGE_DIR", "rag_storage"))
 UPLOAD_DIR = RAG_ROOT / "uploads"
 QDRANT_PATH = os.getenv("QDRANT_PATH", str(RAG_ROOT / "qdrant"))
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "pdf_documents")
-EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
+CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
 
 
 def _ensure_storage_dirs() -> None:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-
-def _get_openai_api_key() -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+# API key function:
+def _get_google_api_key() -> str:
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
+        raise RuntimeError("GOOGLE_API_KEY environment variable is not set")
     return api_key
 
-
-def _get_embeddings() -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(
+# Embeddings function:
+def _get_embeddings() -> GoogleGenerativeAIEmbeddings:
+    return GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
-        api_key=_get_openai_api_key()
+        google_api_key=_get_google_api_key()
     )
 
-
-def _get_llm() -> ChatOpenAI:
-    return ChatOpenAI(
+# LLM function:
+def _get_llm() -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
         model=CHAT_MODEL,
-        api_key=_get_openai_api_key(),
+        google_api_key=_get_google_api_key(),
         temperature=0
     )
-
-
 def _get_qdrant_client() -> QdrantClient:
     return QdrantClient(path=QDRANT_PATH)
 
@@ -72,7 +70,7 @@ def _extract_text_from_pdf(pdf_path: Path) -> list:
 
 def index_pdf_document(file: UploadFile) -> dict:
     _ensure_storage_dirs()
-    _get_openai_api_key()
+    _get_google_api_key()
 
     document_id = str(uuid.uuid4())
     suffix = Path(file.filename or "document.pdf").suffix or ".pdf"
@@ -136,7 +134,7 @@ def index_pdf_document(file: UploadFile) -> dict:
 
 
 def ask_question_about_pdf(document_id: str, question: str) -> dict:
-    _get_openai_api_key()
+    _get_google_api_key()
     client = _get_qdrant_client()
     if not client.collection_exists(COLLECTION_NAME):
         raise ValueError("No PDFs have been indexed yet")
